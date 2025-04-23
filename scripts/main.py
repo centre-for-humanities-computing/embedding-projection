@@ -153,3 +153,84 @@ print(largest_words)
 
 
 # %%
+import json
+# Path to your JSON file
+with open('../data/raw/fiction4_data.json', 'r') as f:
+    data = json.load(f)
+
+
+
+# %% 
+print("Top-level type:", type(data))
+print("Top-level keys:" if isinstance(data, dict) else "First items:")
+print(list(data.keys()) if isinstance(data, dict) else data[:3])
+# %%
+# Transform sentences to lists:
+sentences_fiction4 = list(data['SENTENCE_ENGLISH'].values())
+# Embed sentences_fiction4:
+fiction4_Embedding = MPNET_Model.encode(sentences_fiction4, show_progress_bar=True, device="cuda" if torch.cuda.is_available() else "cpu")
+
+
+# %%
+fiction4_Embedding = pd.DataFrame(fiction4_Embedding)
+fiction4_Embedding['sentiment'] = list(data['HUMAN'].values())
+fiction4_Embedding['review'] = sentences_fiction4
+fiction4_Embedding.to_csv('../data/embeddings/fiction4_Embeddings.csv', index=False)
+
+
+# %%
+fiction4, fiction4_in_1D_subspace = express_matrix_by_vector(fiction4_Embedding.iloc[:, :-2], sentiment_vector)
+# %%
+
+fiction4_in_1D_subspace
+fiction4_Embedding['sentiment']
+
+# %%
+import matplotlib.pyplot as plt
+from scipy.stats import pearsonr
+
+# Assuming both are lists or 1D numpy arrays of length 6300
+x = fiction4_in_1D_subspace
+y = fiction4_Embedding['sentiment']
+
+# Plotting
+plt.scatter(x, y, alpha=0.5)
+plt.xlabel('IMDb-defined Subspace Projection')
+plt.ylabel('Human Annotation')
+plt.title('Scatterplot with Correlation')
+
+# Compute correlation
+corr, _ = pearsonr(x, y)
+plt.figtext(0.15, 0.85, f'Pearson r = {corr:.2f}', fontsize=12, color='blue')
+# Save plot in img folder:
+plt.savefig('../img/Scatterplot_w_Person.png', dpi=300, bbox_inches='tight')
+plt.show()
+
+# %%
+import pandas as pd
+
+# If it's a dictionary
+df = pd.DataFrame({
+    'ANNOTATOR_1': data['ANNOTATOR_1'],
+    'ANNOTATOR_2': data['ANNOTATOR_2'],
+    'ANNOTATOR_3': data['ANNOTATOR_3'],
+})
+
+# Pearson correlation matrix
+correlation_matrix = df.corr(method='pearson')
+# Create the heatmap
+plt.figure(figsize=(6, 4))  # optional: adjust size
+sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', vmin=0, vmax=1)
+
+# Title and layout
+plt.title('Pearson Correlation Between Annotators')
+plt.tight_layout()
+# Save plot in img folder:
+plt.savefig('../img/Annotator_Corr.png', dpi=300, bbox_inches='tight')
+plt.show()
+
+
+# %%
+
+
+
