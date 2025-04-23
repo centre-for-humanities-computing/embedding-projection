@@ -136,3 +136,70 @@ plt.show()
 
 
 # %%
+#from functions import get_clean_words
+def get_clean_words(raw_string):
+    """
+    Takes in a raw_string and returns the set of words appearing in the string.
+    """
+    import re
+    try:
+        clean_text = str(raw_string)  # Convert to string
+        clean_text = re.sub(r'<br/><br/>', ' ', clean_text)  # Remove breaks
+        clean_text = re.sub(r'/', ' ', clean_text)  # Replace forward slashes with space
+        clean_text = re.sub(r'[^a-zA-Z0-9 ]', '', clean_text).lower()  # Remove special characters and lowercase
+        words = clean_text.split()  # Split the text into words
+        unique_words = set(words)  # Get unique words
+        return unique_words
+    except Exception as e:
+        print(f"Error processing input: {raw_string}. Error: {e}")
+        return set()  # Return an empty set in case of failure
+
+# Get the most common words in the positive and negative reviews:
+mapped_set = map(get_clean_words, embedding['review'])
+my_set = set().union(*mapped_set)
+
+# Convert set to list
+words = list(my_set)
+# Initialize the tokenizer, good basic tokenizer
+tokenizer = AutoTokenizer.from_pretrained('sentence-transformers/all-mpnet-base-v2')
+
+
+# Tokenize each word in the list
+tokenized_words = [tokenizer.tokenize(word) for word in words]
+# Flatten the tokenized words list
+flat_tokens = [token for sublist in tokenized_words for token in sublist]
+
+# Save each unique element:
+review_tokens_corpus =  list(set(flat_tokens))
+
+
+# %%
+review_tokens_corpus
+
+# %%
+# Encode the words:
+word_embeddings = MPNET_Model.encode(review_tokens_corpus, show_progress_bar=True, device="cuda" if torch.cuda.is_available() else "cpu")
+# %% 
+word_embeddings=pd.DataFrame(word_embeddings)
+word_embeddings.iloc[0:5] # Check the first 5 rows and columns of the word embeddings
+
+# %%
+projected_variance, projection_in_1D_subspace = express_matrix_by_vector(matrix=word_embeddings, vector=sentiment_vector)
+
+# Find the 10 smallest values' indices
+smallest_indices = projection_in_1D_subspace.nsmallest(10).index
+# Map indices to words in the corpus
+smallest_words = [review_tokens_corpus[i] for i in smallest_indices]
+
+print("Words corresponding to the 10 smallest embeddings:")
+print(smallest_words)
+
+# find the 10 largest values' indices
+largest_indices = projection_in_1D_subspace.nlargest(10).index
+# Map indices to words in the corpus
+largest_words = [review_tokens_corpus[i] for i in largest_indices]
+print("Words corresponding to the 10 largest embeddings:")
+print(largest_words)
+
+
+# %%

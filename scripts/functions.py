@@ -106,3 +106,21 @@ def express_matrix_by_vector(matrix, vector):
     projection_in_1D_subspace = projection.iloc[:,0]/unit_vector.iloc[:,0][0] # Location in subspace
 
     return projection, projection_in_1D_subspace
+
+def get_clean_words(raw_string):
+    """
+    Takes in a raw_string and returns the set of words appearing in the string.
+    """
+    import re
+    try:
+        clean_text = str(raw_string)  # Convert to string
+        clean_text = re.sub(r'<br/><br/>', ' ', clean_text)  # Remove breaks
+        clean_text = re.sub(r'/', ' ', clean_text)  # Replace forward slashes with space
+        clean_text = re.sub(r'[^a-zA-Z0-9 ]', '', clean_text).lower()  # Remove special characters and lowercase
+        words = clean_text.split()  # Split the text into words
+        unique_words = set(words)  # Get unique words
+        return unique_words
+    except Exception as e:
+        print(f"Error processing input: {raw_string}. Error: {e}")
+        return set()  # Return an empty set in case of failure
+
