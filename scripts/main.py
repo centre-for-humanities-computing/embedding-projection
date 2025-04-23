@@ -129,9 +129,10 @@ plt.ylabel('Density')
 plt.legend()
 plt.grid(True)
 plt.tight_layout()
-plt.show()
-
 # Save plot in img folder:
 plt.savefig('../img/sentiment_distributions.png', dpi=300, bbox_inches='tight')
+# Show plot:
+plt.show()
+
 
 # %%
