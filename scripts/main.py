@@ -168,7 +168,7 @@ print(list(data.keys()) if isinstance(data, dict) else data[:3])
 # Transform sentences to lists:
 sentences_fiction4 = list(data['SENTENCE_ENGLISH'].values())
 # Embed sentences_fiction4:
-fiction4_Embedding = MPNET_Model.encode(sentences_fiction4, show_progress_bar=True, device="cuda" if torch.cuda.is_available() else "cpu")
+# fiction4_Embedding = MPNET_Model.encode(sentences_fiction4, show_progress_bar=True, device="cuda" if torch.cuda.is_available() else "cpu")
 
 
 # %%
@@ -176,7 +176,10 @@ fiction4_Embedding = pd.DataFrame(fiction4_Embedding)
 fiction4_Embedding['sentiment'] = list(data['HUMAN'].values())
 fiction4_Embedding['review'] = sentences_fiction4
 fiction4_Embedding.to_csv('../data/embeddings/fiction4_Embeddings.csv', index=False)
-
+# %%
+fiction4_Embedding = pd.read_csv('../data/embeddings/fiction4_Embeddings.csv')
+# Check the las 5 rows of the dataframe:
+fiction4_Embedding.iloc[-5:-1]
 
 # %%
 fiction4, fiction4_in_1D_subspace = express_matrix_by_vector(fiction4_Embedding.iloc[:, :-2], sentiment_vector)
@@ -230,7 +233,45 @@ plt.savefig('../img/Annotator_Corr.png', dpi=300, bbox_inches='tight')
 plt.show()
 
 
+
+
+
+
+
+
+
+
 # %%
+# ______________________________________________________________________________
+#### LINGUISTIC ACCEPTABILITY ####
+# ______________________________________________________________________________
+# Load the dataset:
+from datasets import load_dataset
 
+# Load GLUE dataset subset (e.g., SST-2)
+dataset = load_dataset("nyu-mll/glue", "cola")
+dataset['train']
 
+#%%
 
+# filter postivie and negative subset:
+LA_positive = dataset['train'].filter(lambda x: x['label'] == 1)
+LA_negative = dataset['train'].filter(lambda x: x['label'] == 0)
+# Investigate the shape of the dataframes:
+print(LA_positive.shape)
+print(LA_negative.shape)
+LA_positive
+
+# %%
+from functions import positive_to_negative_vector, express_matrix_by_vector
+
+# Define the sentiment vector by subtracting the mean of the negative from the mean of the positive:
+ling_accept_vector = positive_to_negative_vector(LA_positive['sentence'], LA_negative['sentence'])
+projection, projection_in_1D_subspace = express_matrix_by_vector(embedding.iloc[:, :-2], ling_accept_vector)
+
+# Check mean projection_in_1D_subspace for positive and negative sentiment:
+print(projection_in_1D_subspace[embedding['sentiment'] == "positive"].mean())
+print(projection_in_1D_subspace[embedding['sentiment'] == "negative"].mean())
+
+dataset['train'].to_pandas().iloc[0:5,0:2]
+# %%

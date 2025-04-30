@@ -25,3 +25,27 @@ It seems there is a rather strong correlation between average human anotator and
 Annotations of semantics vary when on a continous scale. Different computational methods produce different scores, but different humans also correlate differently with eachother.
 
 ![Annotator Correlation](./img/Annotator_Corr.png)
+
+
+## We now try to the method on a more complex setting such as Linguistic Acceptability
+This metric can be found in the glue/cola test-set, formally defined as:
+"*The Corpus of Linguistic Acceptability consists of English acceptability judgments drawn from books and journal articles on linguistic theory. Each example is a sequence of words annotated with whether it is a grammatical English sentence.*" 
+
+
+Linguistic Acceptability is meant to be a harder test from the glue benchmark. 
+**Acceptable sentences** are normal correct sentences such as:
+"They drank the pub dry." --> label == 1
+
+**Unacceptable sentences** are syntaxtically correct but makes no semantic sense, i.e.:
+"They drank the pub." --> label == 0
+
+It seems, *through visual investigation*, that the method isn't able to define a direction that encodes for this rather complex linguistic feature.
+
+![Acceptability Histogram](./img/LA_validation_histogram.png)
+
+
+
+
+
+
+
