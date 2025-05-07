@@ -27,6 +27,19 @@ Annotations of semantics vary when on a continous scale. Different computational
 ![Annotator Correlation](./img/Annotator_Corr.png)
 
 
+### Defining the positive- and negative centroids from gold-standard annotations.
+As an attempt to improve the correlation to the gold-standard I defined the model by turning gold-standard human ratings into binary positive/negative.
+if (rating >= 7), then == positive.
+if (rating <= 3) then == negative.
+this imrpoved correlation by 0.02:
+![./img/Scatterplot_fiction4_w_Person_MiniLM.png]
+
+
+#### Changing to the larger MPNET-base-v2 model the correlation further improved:
+![./img/Scatterplot_fiction4_w_Person_MPNET.png]
+
+
+
 ## We now try to the method on a more complex setting such as Linguistic Acceptability
 This metric can be found in the glue/cola test-set, formally defined as:
 "*The Corpus of Linguistic Acceptability consists of English acceptability judgments drawn from books and journal articles on linguistic theory. Each example is a sequence of words annotated with whether it is a grammatical English sentence.*" 
