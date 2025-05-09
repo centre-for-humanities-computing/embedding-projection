@@ -54,60 +54,42 @@ test_mini["label"] = fiction4_loader.df['sentiment']
 test_MPNET = MPNET.embed(fiction4_loader.texts, cache_path="../data/processed/embeddings/fiction4_test_mpnet.csv")
 test_MPNET["label"] = fiction4_loader.df['sentiment']
 
-# %%
-from core.projection import ProjectionAnalyzer
-ProjectionAnalyzer = ProjectionAnalyzer(matrix_concept=train_mini, matrix_project=test_mini)
-ProjectionAnalyzer.project()
-
 
 # %%
 from core.projection import ProjectionAnalyzer
-ProjectionAnalyzer = ProjectionAnalyzer(matrix_concept=train_mini, matrix_project=test_mini)
-ProjectionAnalyzer.project()
-
-from scipy.stats import pearsonr
-import seaborn as sns
-import matplotlib.pyplot as plt
-# Assuming both are lists or 1D numpy arrays of length 6300
-x = ProjectionAnalyzer.projected_in_1D
-y = test_mini["label"].values
+# === 1. Project embeddings ===
+analyzer = ProjectionAnalyzer(matrix_concept=train_MPNET, matrix_project=test_MPNET)
+analyzer.project()
 
 
-# Plotting
-plt.scatter(x, y, alpha=0.5)
-plt.xlabel('Fiction4 defined Subspace Projection')
-plt.ylabel('Human Golden Standard')
-plt.title('Scatterplot with Correlation (MiniLM)')
-
-# Compute correlation
-corr, _ = pearsonr(x, y)
-plt.figtext(0.15, 0.85, f'Pearson r = {corr:.2f}', fontsize=12, color='blue')
-# Save plot in img folder:
-plt.savefig('../img/Scatterplot_fiction4_w_Person_MiniLM.png', dpi=300, bbox_inches='tight')
-plt.show()
-
-# %%
-from core.projection import ProjectionAnalyzer
-ProjectionAnalyzer = ProjectionAnalyzer(matrix_concept=train_MPNET, matrix_project=test_MPNET)
-ProjectionAnalyzer.project()
-
+# === 1. Make a plot ===
+from sklearn.preprocessing import MinMaxScaler
 from scipy.stats import spearmanr
 import seaborn as sns
 import matplotlib.pyplot as plt
-# Assuming both are lists or 1D numpy arrays of length 6300
-x = ProjectionAnalyzer.projected_in_1D
+import numpy as np
+import pandas as pd
+x_raw = analyzer.projected_in_1D
 y = test_MPNET["label"].values
 
-# Plotting
-plt.scatter(x, y, alpha=0.5)
-plt.xlabel('Fiction4 defined Subspace Projection')
-plt.ylabel('Human Golden Standard')
-plt.title('Scatterplot with Correlation (MPNET)')
+# === 2. Rescale projections to [0.2, 9.2] ===
+scaler = MinMaxScaler((1, 9))
+scaled = scaler.fit_transform(x_raw.values.reshape(-1, 1)).flatten()
 
-# Compute correlation
-corr, _ = pearsonr(x, y)
-plt.figtext(0.15, 0.85, f'Spearman ρ = {corr:.2f}', fontsize=12, color='blue')
-# Save plot in img folder:
-plt.savefig('../img/Scatterplot_fiction4_w_Person.png', dpi=300, bbox_inches='tight')
+# === 3. Calculate Spearman correlation ===
+corr, _ = spearmanr(scaled, y)
+
+# === 4. Create the plot ===
+g = sns.jointplot(x=scaled, y=y, kind="scatter", marginal_kws=dict(fill=True),
+                  alpha=0.5, height=7)
+g.ax_joint.set_xlim(0, 10)
+g.ax_joint.set_xticks(np.linspace(1, 9, 9))  # Custom ticks from 1 to 10
+g.ax_joint.set(xlabel='Fiction4 Subspace Projection', ylabel='Human Gold Standard')
+g.ax_joint.set_title(f'Scatterplot with Correlation (MPNET Rescaled)', pad=90)
+g.ax_joint.text(0.05, 0.95, f'Spearman ρ = {corr:.2f}', transform=g.ax_joint.transAxes,
+                fontsize=12, color='blue')
+g.figure.subplots_adjust(top=0.9)
+g.figure.savefig('../img/Scatterplot_fiction4_rescaled.png', dpi=300, bbox_inches='tight')
 plt.show()
-# %%
+
+

@@ -58,6 +58,8 @@ It seems, *through visual investigation*, that the method isn't able to define a
 
 
 
+https://github.com/JULIELab/EmoBank/blob/master/corpus/emobank.csv
+
 
 
 

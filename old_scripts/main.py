@@ -1,12 +1,12 @@
 # %%
 from utils import *
-from functions import *
+from old_scripts.functions import *
 
 # %%
 # Load the dataset:
 IMDb_df = pd.read_csv('../data/raw/imdb.csv')
 print(IMDb_df['review'] [1:5])
-from functions import clean_string
+from old_scripts.functions import clean_string
 # Slice the DataFrame first:
 subset_df  = IMDb_df.iloc[1:2000].reset_index(drop=True)
 
@@ -44,7 +44,7 @@ print(positive.shape)
 print(negative.shape)
 
 # %%
-from functions import positive_to_negative_vector, express_matrix_by_vector
+from old_scripts.functions import positive_to_negative_vector, express_matrix_by_vector
 
 # Define the sentiment vector by subtracting the mean of the negative from the mean of the positive:
 sentiment_vector = positive_to_negative_vector(positive.iloc[:, :-2], negative.iloc[:, :-2])
@@ -101,7 +101,7 @@ plt.show()
 
 
 # %%
-from functions import get_clean_words
+from old_scripts.functions import get_clean_words
 # Get the most common words in the positive and negative reviews:
 mapped_set = map(get_clean_words, embedding['review'])
 my_set = set().union(*mapped_set)
@@ -279,7 +279,7 @@ LA_negative_emb.to_csv('../data/embeddings/LA_negative_emb.csv', index=False)
 LA_validation_embedding = MPNET_Model.encode(dataset['validation']['sentence'], show_progress_bar=True, device="cuda" if torch.cuda.is_available() else "cpu")
 LA_validation_embedding =  pd.DataFrame(LA_validation_embedding)
 # %%
-from functions import positive_to_negative_vector, express_matrix_by_vector
+from old_scripts.functions import positive_to_negative_vector, express_matrix_by_vector
 # Define the acceptability vector by subtracting the mean of the negative from the mean of the positive:
 ling_accept_vector = positive_to_negative_vector(LA_positive_emb, LA_negative_emb)
 # Project validation embedding onto the acceptability vector:
