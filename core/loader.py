@@ -1,9 +1,11 @@
 import re
 import pandas as pd
+from datasets import load_dataset
+from sklearn.model_selection import train_test_split
 
 class CorpusLoader:
     """
-    Loads, cleans, and formats text-label datasets from CSV files.
+    Loads, cleans, splits, and formats text-label datasets from CSV or Hugging Face.
     Standardizes columns to ['sentence', 'label'] for embedding and projection.
     """
     def __init__(self, path=None, text_col="sentence", label_col="label"):
@@ -12,21 +14,12 @@ class CorpusLoader:
         self.label_col = label_col
         self.hugginface = None
         self.df = None
-        self.embedding = None
         self.df_cache = None
+        self.hugginface = None
+        self.train_df = None
+        self.test_df = None
 
     def load_csv(self, start=0, n_rows=None):
-        """
-        Loads a dataset from the specified path, starting at `start` and 
-        loading up to `n_rows` rows.
-
-        :param start: int
-            Row index to start loading from (default is 0).
-        :param n_rows: int, optional
-            Number of rows to load starting from `start`. If None, load to end of file.
-        :return: DataFrame
-            Trimmed DataFrame with renamed 'sentence' and 'label' columns.
-        """
         try:
             df = pd.read_csv(self.path)
         except FileNotFoundError:
@@ -42,11 +35,9 @@ class CorpusLoader:
         end = start + n_rows if n_rows is not None else len(df)
         df = df.iloc[start:end].reset_index(drop=True)
 
-        # Check columns
         if self.text_col not in df.columns or self.label_col not in df.columns:
             raise ValueError(f"CSV must contain columns '{self.text_col}' and '{self.label_col}'.")
 
-        # Rename columns
         df.rename(columns={self.text_col: 'sentence', self.label_col: 'label'}, inplace=True)
         self.text_col = 'sentence'
         self.label_col = 'label'
@@ -54,18 +45,6 @@ class CorpusLoader:
         return df
 
     def load_from_huggingface(self, dataset_name, split="train"):
-        """
-        Loads a dataset from Hugging Face's datasets library.
-
-        :param dataset_name: str
-            The name of the dataset to load.
-        :param split: str
-            The split of the dataset to load (default is "train").
-        :return: DataFrame
-            The loaded DataFrame.
-        """
-        from datasets import load_dataset
-
         try:
             self.hugginface = load_dataset(dataset_name, split=split)
         except Exception as e:
@@ -74,50 +53,33 @@ class CorpusLoader:
         if self.text_col not in self.hugginface.column_names or self.label_col not in self.hugginface.column_names:
             raise ValueError(f"Dataset must contain columns '{self.text_col}' and '{self.label_col}'.")
 
-        # Convert to DataFrame
         df = pd.DataFrame(self.hugginface)
-        
-        # Rename columns
         df.rename(columns={self.text_col: 'sentence', self.label_col: 'label'}, inplace=True)
         self.text_col = 'sentence'
         self.label_col = 'label'
         self.df = df
         return df
 
-
     def load_from_dataframe(self, df):
-        """
-        Loads a DataFrame directly into the CorpusLoader.
-
-        :param df: DataFrame
-            The DataFrame to load.
-        :return: DataFrame
-            The loaded DataFrame.
-        """
         if not isinstance(df, pd.DataFrame):
             raise TypeError("Input must be a pandas DataFrame.")
-        
         self.df = df.copy()
         if self.text_col not in self.df.columns or self.label_col not in self.df.columns:
             raise ValueError(f"DataFrame must contain columns '{self.text_col}' and '{self.label_col}'.")
-        
-        # Rename columns
         self.df.rename(columns={self.text_col: 'sentence', self.label_col: 'label'}, inplace=True)
         self.text_col = 'sentence'
         self.label_col = 'label'
         return self.df
 
     def _clean_string(self, raw_string):
-        """Cleans the string by removing HTML, slashes, special chars, and lowercasing."""
         if not isinstance(raw_string, str):
             raw_string = str(raw_string) if pd.notnull(raw_string) else ""
-        clean_text = re.sub(r'<br\s*/?>', '', raw_string)  # Handles <br> tags
+        clean_text = re.sub(r'<br\s*/?>', '', raw_string)
         clean_text = re.sub(r'/', ' ', clean_text)
         clean_text = re.sub(r'[^a-zA-Z0-9 ]', '', clean_text).lower()
         return clean_text
 
     def clean(self):
-        """Applies text cleaning to the 'sentence' column."""
         if self.df is None:
             raise ValueError("Data not loaded. Call `load_csv()` first.")
         if self.text_col not in self.df.columns:
@@ -126,59 +88,40 @@ class CorpusLoader:
         return self.df
 
     def reduce_to_columns(self):
-        """
-        Reduces the DataFrame to only the text and label columns.
-        Useful for ensuring the model only processes the necessary columns.
-        """
-        if self.df is None:
-            raise ValueError("Data not loaded. Call `load_csv()` first.")
-        if self.df_cache is None:
-            self.df_cache = self.df
-        self.df = self.df[[self.text_col, self.label_col]].copy()
-
-        return self.df
-    
-
-    # Create a method that transforms the labels to binary, hvile keeping the original labels in continous_labl column:
-    def transform_labels_to_binary(self, positive_threshold =0.5, negative_threshold=0.5):
-        """
-        Transforms labels to binary ('positive', 'negative') while preserving original labels in 'continuous_label'.
-
-        Either provide:
-        - `positive_labels` and `negative_labels` as sets/lists of discrete labels
-        OR
-        - `threshold` for numeric labels (everything above is positive, below is negative)
-
-        Labels not matching either positive or negative categories will be labeled as 'neutral'.
-
-        :param positive_labels: list or set of labels considered positive (used if threshold is None)
-        :param negative_labels: list or set of labels considered negative (used if threshold is None)
-        :param threshold: numeric value for splitting continuous label values into positive/negative
-        """
-        if self.df is None:
-            raise ValueError("Data not loaded. Call `load_csv()` first.")
-
-        self.df['continuous_label'] = self.df[self.label_col]
-
-            # Continuous label mode
-        self.df[self.label_col] = self.df[self.label_col].apply(
-            lambda x: "positive" if x >= positive_threshold  else ("negative" if x <= negative_threshold else "neutral")
-        )
-        return self.df
-
-    def drop_neutral(self):
-        """
-        Drops rows labeled as 'neutral' in the label column.
-
-        :return: DataFrame
-            The updated DataFrame without 'neutral' labels.
-        """
         if self.df is None:
             raise ValueError("Data not loaded.")
         if self.df_cache is None:
-            self.df_cache = self.df        
-        self.df = self.df[self.df[self.label_col] != "neutral"].reset_index(drop=True)
+            self.df_cache = self.df
+        self.df = self.df[[self.text_col, self.label_col]].copy()
         return self.df
+
+    def split_binary_train_continuous_test(self, positive_threshold=0.5, negative_threshold=0.5, train_size=0.6, random_state=42):
+        if self.df is None:
+            raise ValueError("Data not loaded.")
+
+        # Create copy and add binary labels
+        df = self.df.copy()
+        df['continuous_label'] = df[self.label_col]
+        df['binary_label'] = df['continuous_label'].apply(
+            lambda x: "positive" if x >= positive_threshold else ("negative" if x <= negative_threshold else "neutral")
+        )
+        # Create a binary DataFrame without neutral labels, to avoid wasting data during train/test split:
+        binary_df = df[df['binary_label'] != 'neutral'].reset_index(drop=True)
+        train_df, heldout_df = train_test_split(binary_df, train_size=train_size, stratify=binary_df['binary_label'], random_state=random_state)
+        
+        # Remove train data from test data:
+        test_df = df.drop(index=train_df.index).reset_index(drop=True)
+        # Reset index for train_df
+        train_df = train_df.reset_index(drop=True)
+
+        # Rename train and test DataFrames to standardize column names in compliance with the rest of the code: 
+        self.train_df = train_df.rename(columns={self.text_col: 'sentence'})
+        self.train_df['label'] = self.train_df['binary_label']
+
+        self.test_df = test_df.rename(columns={self.text_col: 'sentence'})
+        self.test_df['label'] = self.test_df['continuous_label']
+
+        return self.train_df, self.test_df
 
     @property
     def texts(self):
@@ -191,3 +134,27 @@ class CorpusLoader:
         if self.df is None:
             raise ValueError("Data not loaded.")
         return self.df[self.label_col].tolist()
+
+    @property
+    def train_texts(self):
+        if self.train_df is None:
+            raise ValueError("Train/Test split not performed yet.")
+        return self.train_df['sentence'].tolist()
+
+    @property
+    def test_texts(self):
+        if self.test_df is None:
+            raise ValueError("Train/Test split not performed yet.")
+        return self.test_df['sentence'].tolist()
+
+    @property
+    def train_labels(self):
+        if self.train_df is None:
+            raise ValueError("Train/Test split not performed yet.")
+        return self.train_df['label'].tolist()
+
+    @property
+    def test_labels(self):
+        if self.test_df is None:
+            raise ValueError("Train/Test split not performed yet.")
+        return self.test_df['label'].tolist()
