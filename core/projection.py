@@ -9,6 +9,7 @@ class ProjectionAnalyzer:
         self.projection_df = matrix_project
         self.projected_matrix = None
         self.projected_in_1D = None
+        self.projection_distance = None
 
         if matrix_concept is not None:
             self.label_col = matrix_concept.columns[-1]  # Assuming the last column is the label
@@ -42,7 +43,7 @@ class ProjectionAnalyzer:
             return label_check_result
         
         # Proceed with the projection if all tests pass
-        self.projected_matrix, self.projected_in_1D = self._express_matrix_by_vector(self.projection_df.iloc[:, :-1], self.concept_vector)
+        self.projected_matrix, self.projected_in_1D, self.projection_distance = self._express_matrix_by_vector(self.projection_df.iloc[:, :-1], self.concept_vector)
         return self.projected_matrix, self.projected_in_1D
 
     def define_concept_vector(self):
@@ -69,18 +70,27 @@ class ProjectionAnalyzer:
     def _express_matrix_by_vector(self, matrix, vector):
         """Return both the projection (rank = 1) and the corresponding 1D subspace coordinates of the projections."""
         unit_vector = vector / np.linalg.norm(vector)  # Step 1: Normalize the vector
-        projection = self._project_matrix_to_vector(matrix, vector)  # Step 2: Project the matrix onto the vector
+        projection, projection_distance = self._project_matrix_to_vector_with_distance(matrix, vector)  # Step 2: Project the matrix onto the vector
         projection_in_1D_subspace = projection.iloc[:, 0] / unit_vector.iloc[:, 0][0]  # Step 3: Compute the projection in the 1D subspace
-        return projection, projection_in_1D_subspace  # Step 4: Return both projections
+        return projection, projection_in_1D_subspace, projection_distance  # Step 4: Return both projections
 
     @staticmethod
-    def _project_matrix_to_vector(matrix, vector):
-        """Project matrix onto subspace spanned by the vector."""
-        m = matrix.to_numpy()  # Convert to numpy arrays
+    def _project_matrix_to_vector_with_distance(matrix, vector):
+        """Project matrix onto subspace spanned by the vector and compute distances."""
+        m = matrix.to_numpy()
         v = vector.to_numpy()[0]
-        v_dot_v = np.dot(v, v)  # Compute the projection
-        projection = np.outer(np.dot(m, v) / v_dot_v, v)
-        return pd.DataFrame(projection)
+        v_dot_v = np.dot(v, v)
+        
+        # Compute projection
+        proj = np.outer(np.dot(m, v) / v_dot_v, v)
+        
+        # Compute residuals and distances
+        residuals = m - proj
+        distances = np.linalg.norm(residuals, axis=1)
+        
+        # Return projection as DataFrame and distances as Series
+        return pd.DataFrame(proj, columns=matrix.columns), pd.Series(distances, index=matrix.index)
+
 
     def _check_matrices_length(self):
         """Ensure that matrix_concept and matrix_project have the same number of columns."""

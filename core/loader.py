@@ -12,7 +12,6 @@ class CorpusLoader:
         self.path = path
         self.text_col = text_col
         self.label_col = label_col
-        self.hugginface = None
         self.df = None
         self.df_cache = None
         self.hugginface = None
