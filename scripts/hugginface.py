@@ -35,6 +35,7 @@ test_MPNET["label"] = loader.test_labels
 EmoBank_MPNET = MultiLingMPNET.embed(loaderEmoBank.df['sentence'], cache_path="../data/processed/embeddings/EmoBank_MultiLingMPNET.csv")
 EmoBank_MPNET["valence"] = loaderEmoBank.df['label']
 
+
 # %%
 # Define masks for english and danish for training set
 english_mask_train = loader.train_df['category'].isin(['poetry', 'prose'])
@@ -74,7 +75,7 @@ train_test_pairs_english_danish = [
 ]
 train_english_test_danish = [
     (HEMMING_train, HCA_test, "Trained on Prose → Tested on Fairytales"),
-    (HEMMING_train, HYMN_test, "Trained on Prose → TTested on Hymns"),
+    (HEMMING_train, HYMN_test, "Trained on Prose → Tested on Hymns"),
     (SYLVIA_train, HCA_test, "Trained on Poetry → Tested on Fairytales"),
     (SYLVIA_train, HYMN_test, "Trained on Poetry → Tested on Hymns")
 ]
@@ -100,12 +101,13 @@ train_mask = english_mask_train
 test_mask = english_mask_test
 
 # === 1. Project embeddings ===
-analyzer = ProjectionAnalyzer(matrix_concept=train_MPNET[danish_mask_test], matrix_project=test_MPNET[english_mask_test])
+analyzer = ProjectionAnalyzer(matrix_concept=train_MPNET, matrix_project=test_MPNET[english_mask_test])
 analyzer.project()
 
 # === 2. Make a plot ===
 x_raw = analyzer.projected_in_1D
 y = test_MPNET[english_mask_test]['label'].values
+
 
 # === 3. Rescale projections to [0.2, 9.2] ===
 scaler = MinMaxScaler((1, 9))
@@ -126,6 +128,13 @@ g.ax_joint.text(0.05, 0.95, f'Spearman ρ = {corr:.2f}', transform=g.ax_joint.tr
 g.figure.subplots_adjust(top=0.9)
 plt.show()
 
+
+
+## Also save a dataframe for sampling later
+Projection_For_Sampling = pd.DataFrame({
+    'Prediction': scaled,
+    'Sentence': np.array(loader.test_texts)[english_mask_test]
+})
 
 # %%
 # Plotting function for projection grid with marginals - 4x4 setup
@@ -445,4 +454,212 @@ df_combined = pd.DataFrame({
     'original_sentence': loaderEmoBank.df['sentence']
     })
 df_combined
+# %%
+# --- SAMPLE DATA FOR EXPERIMENT:
+import pandas as pd
+import numpy as np
+
+# Ensure 'valence' is a float
+test_MPNET['valence'] = test_MPNET['valence'].astype(float)
+df_sorted = test_MPNET.sort_values(by='valence').reset_index(drop=True)
+
+# --- Step 1: Sample 50 indexes using threshold logic ---
+samples = []
+sampled_indices = []
+
+while len(samples) < 50:
+    threshold = np.random.uniform(2.5, 3.5)
+    match = df_sorted[df_sorted['valence'] > threshold].head(1)
+    if not match.empty:
+        idx = match.index[0]
+        if idx not in sampled_indices:
+            samples.append(match[['valence', 'sentence']].iloc[0])
+            sampled_indices.append(idx)
+
+# --- Step 2: For each sampled index, run the pair sampling ---
+valences = df_sorted['valence'].values
+sentences = df_sorted['sentence'].values
+n_pairs = 5
+
+paired_sentences = []
+
+for idx in sampled_indices:
+    current_valence = valences[idx]
+    current_sentence = sentences[idx]
+    mask = np.arange(len(valences)) != idx
+    other_valences = valences[mask]
+    other_sentences = sentences[mask]
+    chosen_indices = set()
+    pairs_found = 0
+    # Keep sampling until 5 pairs are found
+    while pairs_found < 5:
+        target = np.random.normal(loc=current_valence, scale=0.5)
+        diffs = np.abs(other_valences - target)
+        for i in np.argsort(diffs):
+            # Only accept if valence is within [1.5, 4.5] and not already chosen
+            if i not in chosen_indices and 1.5 <= other_valences[i] <= 4.5:
+                chosen_indices.add(i)
+                paired_sentences.append({
+                    'original_sentence': current_sentence,
+                    'original_valence': current_valence,
+                    'paired_sentence': other_sentences[i],
+                    'paired_valence': other_valences[i]
+                })
+                pairs_found += 1
+                break  # Found a suitable pair, move to next
+
+paired_df = pd.DataFrame(paired_sentences)
+paired_df
+
+# %%
+import json
+
+# Build the list of pairs
+pairs = []
+for _, row in paired_df.iterrows():
+    pairs.append({
+        "sentences": [
+            row["original_sentence"],
+            row["paired_sentence"]
+        ]
+    })
+
+# Save to JSON
+output = {"pairs": pairs}
+with open("paired_sentences.json", "w", encoding="utf-8") as f:
+    json.dump(output, f, ensure_ascii=False, indent=4)
+
+
+# %%
+import pandas as pd
+import numpy as np
+
+def sample_and_pair_categories_unique(df, pred_col='Prediction', sent_col='Sentence', n_samples=50, random_state=None):
+    if random_state is not None:
+        np.random.seed(random_state)
+
+    # Define categories
+    low_df = df[df[pred_col] <= 3].reset_index(drop=True)
+    med_df = df[(df[pred_col] >= 4) & (df[pred_col] <= 6)].reset_index(drop=True)
+    high_df = df[df[pred_col] >= 7].reset_index(drop=True)
+
+    # Print unique counts for debugging
+    print("Unique low sentences:", low_df[sent_col].nunique())
+    print("Unique med sentences:", med_df[sent_col].nunique())
+    print("Unique high sentences:", high_df[sent_col].nunique())
+
+    # Warn if not enough unique sentences to guarantee unique pairs
+    if low_df[sent_col].nunique() < n_samples + 1:
+        print("Warning: Not enough unique low sentences to guarantee unique pairs.")
+    if med_df[sent_col].nunique() < n_samples + 1:
+        print("Warning: Not enough unique medium sentences to guarantee unique pairs.")
+    if high_df[sent_col].nunique() < n_samples + 1:
+        print("Warning: Not enough unique high sentences to guarantee unique pairs.")
+
+    # Sample n_samples from each category (with replacement if not enough)
+    low_samples = low_df.sample(n=n_samples, replace=len(low_df) < n_samples, random_state=random_state)
+    med_samples = med_df.sample(n=n_samples, replace=len(med_df) < n_samples, random_state=random_state)
+    high_samples = high_df.sample(n=n_samples, replace=len(high_df) < n_samples, random_state=random_state)
+
+    # Track used sentences for each category
+    used_low = set()
+    used_med = set()
+    used_high = set()
+
+    # Helper to get prediction for a sentence
+    pred_lookup = df.set_index(sent_col)[pred_col].to_dict()
+
+    def get_unique_pair(row, pool_df, used_set):
+        pool = pool_df[(pool_df[sent_col] != row[sent_col]) & (~pool_df[sent_col].isin(used_set))]
+        if pool.empty:
+            pool = pool_df[pool_df[sent_col] != row[sent_col]]
+        chosen = pool.sample(1, random_state=random_state)[sent_col].values[0]
+        used_set.add(chosen)
+        return chosen
+
+    pairs = []
+    for _, row in low_samples.iterrows():
+        pair_low = get_unique_pair(row, low_df, used_low)
+        pair_med = get_unique_pair(row, med_df, used_med)
+        pair_high = get_unique_pair(row, high_df, used_high)
+        pairs.append({
+            "original_sentence": row[sent_col],
+            "original_category": "low",
+            "original_prediction": row[pred_col],
+            "pair_low": pair_low,
+            "pair_low_prediction": pred_lookup.get(pair_low, np.nan),
+            "pair_med": pair_med,
+            "pair_med_prediction": pred_lookup.get(pair_med, np.nan),
+            "pair_high": pair_high,
+            "pair_high_prediction": pred_lookup.get(pair_high, np.nan)
+        })
+    for _, row in med_samples.iterrows():
+        pair_low = get_unique_pair(row, low_df, used_low)
+        pair_med = get_unique_pair(row, med_df, used_med)
+        pair_high = get_unique_pair(row, high_df, used_high)
+        pairs.append({
+            "original_sentence": row[sent_col],
+            "original_category": "medium",
+            "original_prediction": row[pred_col],
+            "pair_low": pair_low,
+            "pair_low_prediction": pred_lookup.get(pair_low, np.nan),
+            "pair_med": pair_med,
+            "pair_med_prediction": pred_lookup.get(pair_med, np.nan),
+            "pair_high": pair_high,
+            "pair_high_prediction": pred_lookup.get(pair_high, np.nan)
+        })
+    for _, row in high_samples.iterrows():
+        pair_low = get_unique_pair(row, low_df, used_low)
+        pair_med = get_unique_pair(row, med_df, used_med)
+        pair_high = get_unique_pair(row, high_df, used_high)
+        pairs.append({
+            "original_sentence": row[sent_col],
+            "original_category": "high",
+            "original_prediction": row[pred_col],
+            "pair_low": pair_low,
+            "pair_low_prediction": pred_lookup.get(pair_low, np.nan),
+            "pair_med": pair_med,
+            "pair_med_prediction": pred_lookup.get(pair_med, np.nan),
+            "pair_high": pair_high,
+            "pair_high_prediction": pred_lookup.get(pair_high, np.nan)
+        })
+
+    return pd.DataFrame(pairs)
+
+# Usage:
+result_df = sample_and_pair_categories_unique(Projection_For_Sampling, pred_col='Prediction', sent_col='Sentence', n_samples=30, random_state=42)
+result_df
+result_df.to_csv("../data/processed/csv/sentence_samples.csv", index=False, encoding="utf-8")
+
+# %%
+import json
+# Filter for medium original sentences
+medium_df = result_df[result_df["original_category"] == "medium"]
+
+# Build the list of pairs for each type
+pairs = []
+for _, row in medium_df.iterrows():
+    pairs.append({
+        "sentences": [
+            row["original_sentence"],
+            row["pair_low"]
+        ]
+    })
+    pairs.append({
+        "sentences": [
+            row["original_sentence"],
+            row["pair_med"]
+        ]
+    })
+    pairs.append({
+        "sentences": [
+            row["original_sentence"],
+            row["pair_high"]
+        ]
+    })
+
+# Save to JSON
+output = {"pairs": pairs}
+with open("paired_sentences_medium.json", "w", encoding="utf-8") as f:
+    json.dump(output, f, ensure_ascii=False, indent=4)
 # %%
