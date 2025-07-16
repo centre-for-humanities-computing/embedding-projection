@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-
+from sklearn.linear_model import LogisticRegression
 class ProjectionAnalyzer:
     def __init__(self, matrix_concept=None, matrix_project=None):
         self.concept_df = matrix_concept
@@ -109,5 +109,19 @@ class ProjectionAnalyzer:
             return "The last column of matrix_concept must contain only 'positive' and 'negative' labels."
 
         return None
+    
+
+    def define_logistic_concept_vector(self):
+        # Assume the last column is the label
+        X = self.concept_df.iloc[:, :-1].values
+        y = (self.concept_df[self.label_col] == "positive").astype(int).values
+        clf = LogisticRegression(solver='liblinear')
+        clf.fit(X, y)
+        # The coefficients are the concept direction
+        coef = clf.coef_.flatten()
+        # Return as a DataFrame for compatibility
+        return pd.DataFrame([coef], columns=self.concept_df.columns[:-1])
+
+
 
 # %%

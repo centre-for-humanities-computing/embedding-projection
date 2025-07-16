@@ -122,6 +122,48 @@ class CorpusLoader:
 
         return self.train_df, self.test_df
 
+    def split_extremes_train_middle_test(self, extreme_frac=0.2, remove_frac_from_extremes=0.0, random_state=42):
+        """
+        Splits the dataset so that the train set contains the lowest and highest extremes (by label),
+        each of size (extreme_frac/2), and the test set contains the middle plus optionally a fraction
+        of the extremes (remove_frac_from_extremes).
+        
+        Args:
+            extreme_frac: float, total fraction of data to use as extremes (e.g., 0.2 for 10% min + 10% max)
+            remove_frac_from_extremes: float, fraction of the extremes to move to the test set (e.g., 0.5 for half)
+            random_state: int, for reproducibility
+        Returns:
+            train_df, test_df (both with columns ['sentence', 'label'])
+        """
+        if self.df is None:
+            raise ValueError("Data not loaded.")
+        df = self.df.copy()
+        n = len(df)
+        n_extreme = int(n * extreme_frac / 2)
+        if n_extreme < 1:
+            raise ValueError("Not enough samples for the requested extreme fraction.")
+        # Sort by label
+        df_sorted = df.sort_values(self.label_col, ascending=True)
+        min_extremes = df_sorted.iloc[:n_extreme].copy()
+        max_extremes = df_sorted.iloc[-n_extreme:].copy()
+        middle = df_sorted.iloc[n_extreme:-n_extreme].copy() if n_extreme > 0 else df_sorted.copy()
+        # Optionally, move a fraction of extremes to test set
+        if remove_frac_from_extremes > 0:
+            min_extreme_test = min_extremes.sample(frac=remove_frac_from_extremes, random_state=random_state)
+            max_extreme_test = max_extremes.sample(frac=remove_frac_from_extremes, random_state=random_state)
+            min_extremes = min_extremes.drop(index=min_extreme_test.index)
+            max_extremes = max_extremes.drop(index=max_extreme_test.index)
+            test_df = pd.concat([middle, min_extreme_test, max_extreme_test], ignore_index=True)
+        else:
+            test_df = middle
+        train_df = pd.concat([min_extremes, max_extremes], ignore_index=True)
+        # Standardize columns
+        train_df = train_df.rename(columns={self.text_col: 'sentence', self.label_col: 'label'})
+        test_df = test_df.rename(columns={self.text_col: 'sentence', self.label_col: 'label'})
+        self.train_df = train_df
+        self.test_df = test_df
+        return train_df, test_df
+
     @property
     def texts(self):
         if self.df is None:

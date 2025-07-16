@@ -1,24 +1,33 @@
 #%% 
+# --- Import packages ---
+# Import necessary libraries
 import sys, os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+# Import custom modules
 from core.loader import CorpusLoader
 from core.embedder import Embedder
 from core.projection import ProjectionAnalyzer
-# --- Initialize loaders ---
-MultiLingMPNET = Embedder(model_name="paraphrase-multilingual-mpnet-base-v2")
+
+
 # %%
-# --- Initialize loaders ---
-# Load the fiction4 dataset from HuggingFace -- Training set (positive/negative filter
+# --- Load Classes, Split Data and Investigate the Data ---
+# --- Initialize Embedder Class:
+MultiLingMPNET = Embedder(model_name="paraphrase-multilingual-mpnet-base-v2")
+
+# --- Initialize Loader Class:
+# Load the fiction4 dataset from HuggingFace -- Training set (positive/negative filter)
 loader = CorpusLoader(text_col="text", label_col="label")
 loader.load_from_huggingface("chcaa/fiction4sentiment", split="train")
-loader.split_binary_train_continuous_test(positive_threshold=7, negative_threshold=3, train_size=0.6, random_state=42)
+loader.split_binary_train_continuous_test(positive_threshold=7, negative_threshold=3, train_size=0.6, random_state=42) # Define the thresholds for positive and negative labels, and split the non-neutral elements into training and test sets.
+
 # Print the distribution of labels in the training set
 print(loader.df.shape)
 print(loader.train_df.shape)
 print(loader.train_df['label'].value_counts())
 print(loader.test_df.shape)
 #%%
-# Load the EmoBank Corpus
+# --- Load the EmoBank Corpus ---
 loaderEmoBank = CorpusLoader(path=("../../EmoBank/corpus/emobank.csv"),text_col="text", label_col="V")
 loaderEmoBank.load_csv()
 loaderEmoBank.df.head()
