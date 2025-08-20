@@ -140,7 +140,11 @@ for genre in genres:
     genre_df.head()
     genre_loader.load_from_dataframe(genre_df)
     # Use extremes split for 1-5 scale (e.g., 10% min + 10% max for train, rest for test)
-    genre_loader.split_extremes_train_middle_test(extreme_frac=0.1, remove_frac_from_extremes=0.5, random_state=42)
+    # genre_loader.split_extremes_train_middle_test(extreme_frac=0.1, remove_frac_from_extremes=0.5, random_state=42)
+    
+    # Use thresholds for 1-5 scale (e.g., pos>=4, neg<=2)
+    genre_loader.split_binary_train_continuous_test(positive_threshold=3.75, negative_threshold=2.5, train_size=0.6, random_state=42)
+
     # Embed train and test sets
     train_emb = MultiLingMPNET.embed(genre_loader.train_texts)
     test_emb = MultiLingMPNET.embed(genre_loader.test_texts)
