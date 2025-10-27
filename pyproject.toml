@@ -1,0 +1,26 @@
+[project]
+name = "Embedding_Projection"
+description = "This project is part of the research project 'Continuous sentiment scores for literary and multilingual contexts' (https://arxiv.org/abs/2508.14620). It contains the datasets used, the functions used to embed the data, and a method for projecting new data onto the 'Concept Vector'."
+authors = [{name = "Laurits Lyngbaek", email = "laurits@cc.au.dk"}]
+version = "1.0.0"
+requires-python = ">=3.8"
+dependencies = [
+    "datasets>=4.1.1",
+    "matplotlib>=3.10.6",
+    "pandas>=2.3.3",
+    "seaborn>=0.13.2",
+    "sentence-transformers>=5.1.1",
+    "numpy>=2.3.3",
+    "scikit-learn>=1.7.2",
+    "torch>=2.8.0",
+    "transformers>=4.56.2",
+]
+readme = {file = "README.md", content-type = "text/markdown"}
+license = "MIT"
+
+[project.scripts]
+main = "main:main"
+
+[project.urls]
+Paper = "https://arxiv.org/abs/2508.14620"
+Repository = "https://github.com/centre-for-humanities-computing/embedding-projection"

@@ -1,0 +1,25 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: Semantic Projection
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - given-names: Laurits Wieslander
+    family-names: Lyngbaek
+    email: laurits@cc.au.dk
+    orcid: 'https://orcid.org/0009-0008-7995-3459'
+    affiliation: Aarhus University
+identifiers:
+  - type: other
+    value: 'arXiv:2508.14620v1'
+    description: arXiv preprint
+abstract: >-
+  The script and datasets for reproducing the 'Continuous
+  sentiment scores for literary and multilingual contexts'
+  paper.
+license: MIT
+version: 1.0.0
